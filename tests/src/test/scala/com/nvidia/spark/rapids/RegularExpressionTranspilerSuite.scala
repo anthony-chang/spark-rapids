@@ -162,6 +162,18 @@ class RegularExpressionTranspilerSuite extends FunSuite with Arm {
     )
   }
 
+  test("temp1") {
+    assertCpuGpuMatchesRegexpReplace(Seq("\\R{2}"), 
+      Seq("a\r\nb")
+    )
+  }
+
+  test("temp2") {
+    assertCpuGpuMatchesRegexpReplace(Seq("(\r\n|[\n\u000B\u000C\r\u0085\u2028\u2029]){2}"), 
+      Seq("a\r\nb")
+    )
+  }
+
   test("octal digits - find") {
     val patterns = Seq(raw"\07", raw"\077", raw"\0177", raw"\01772", raw"\0200", 
       raw"\0376", raw"\0377", raw"\02002")
@@ -692,6 +704,8 @@ class RegularExpressionTranspilerSuite extends FunSuite with Arm {
         case e: CudfException =>
           fail(s"cuDF failed to compile pattern: ${toReadableString(cudfPattern)}", e)
       }
+      println(toReadableString(cudfPattern))
+
       for (i <- input.indices) {
         if (cpu(i) != gpu(i)) {
           fail(s"javaPattern=${toReadableString(javaPattern)}, " +
@@ -699,6 +713,13 @@ class RegularExpressionTranspilerSuite extends FunSuite with Arm {
             s"input='${toReadableString(input(i))}', " +
             s"cpu=${toReadableString(cpu(i))}, " +
             s"gpu=${toReadableString(gpu(i))}")
+        }
+        else {
+          println((s"javaPattern=${toReadableString(javaPattern)}, " +
+            s"cudfPattern=${toReadableString(cudfPattern)}, " +
+            s"input='${toReadableString(input(i))}', " +
+            s"cpu=${toReadableString(cpu(i))}, " +
+            s"gpu=${toReadableString(gpu(i))}"))
         }
       }
     }
@@ -740,6 +761,11 @@ class RegularExpressionTranspilerSuite extends FunSuite with Arm {
       case '\r' => "\\r"
       case '\n' => "\\n"
       case '\t' => "\\t"
+      case '\u000B' => "\\u000B"
+      case '\u000C' => "\\u000C"
+      case '\u0085' => "\\u0085"
+      case '\u2028' => "\\u2028"
+      case '\u2029' => "\\u2029"
       case other => other
     }.mkString
   }
