@@ -27,6 +27,16 @@ import org.apache.spark.sql.rapids.GpuRegExpUtils
 import org.apache.spark.sql.types.DataTypes
 
 class RegularExpressionTranspilerSuite extends FunSuite with Arm {
+  test("temp1") {
+    assertCpuGpuMatchesRegexpFind(Seq("$x*\r"), Seq("\r"))
+  }
+  test("temp2") {
+    assertCpuGpuMatchesRegexpFind(Seq("$x*a"), Seq("a"))
+  }
+
+  test("temp3") {
+    assertCpuGpuMatchesRegexpFind(Seq("$\r"), Seq("\r"))
+  }
 
   test("transpiler detects invalid cuDF patterns") {
     // The purpose of this test is to document some examples of valid Java regular expressions
@@ -371,7 +381,7 @@ class RegularExpressionTranspilerSuite extends FunSuite with Arm {
     assertCpuGpuMatchesRegexpFind(patterns, inputs)
   }
 
-  private val REGEXP_LIMITED_CHARS_COMMON = "|()[]{},.^$*+?abc123x\\ \t\r\n\f\u000bBsdwSDWzZ"
+  private val REGEXP_LIMITED_CHARS_COMMON = "|()[]{},.^$*+?abc123x\\ \t\r\n\f\u000bBsdwSDWzZ_"
 
   private val REGEXP_LIMITED_CHARS_FIND = REGEXP_LIMITED_CHARS_COMMON
 
@@ -689,6 +699,11 @@ class RegularExpressionTranspilerSuite extends FunSuite with Arm {
       for (i <- input.indices) {
         if (cpu(i) != gpu(i)) {
           fail(s"javaPattern=${toReadableString(javaPattern)}, " +
+            s"cudfPattern=${toReadableString(cudfPattern)}, " +
+            s"input='${toReadableString(input(i))}', " +
+            s"cpu=${cpu(i)}, gpu=${gpu(i)}")
+        } else {
+          println(s"javaPattern=${toReadableString(javaPattern)}, " +
             s"cudfPattern=${toReadableString(cudfPattern)}, " +
             s"input='${toReadableString(input(i))}', " +
             s"cpu=${cpu(i)}, gpu=${gpu(i)}")
