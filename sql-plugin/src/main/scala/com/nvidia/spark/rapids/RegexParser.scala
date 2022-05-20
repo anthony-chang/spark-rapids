@@ -721,9 +721,13 @@ class CudfRegexTranspiler(mode: RegexMode) {
               // an empty RegexAST that outputs to empty string
               RegexEmpty()
             case Some(RegexChar(ch)) if mode == RegexReplaceMode
-                && lineTerminatorChars.contains(ch) =>
-                throw new RegexUnsupportedException("Regex sequences with a line terminator " 
-                    + "character followed by '$' are not supported in replace mode")
+              && lineTerminatorChars.contains(ch) =>
+              throw new RegexUnsupportedException("Regex sequences with a line terminator " 
+                  + "character followed by '$' are not supported in replace mode")
+            case Some(RegexEscaped(ch)) if mode == RegexReplaceMode 
+              && (ch == 's' || ch == 'v' || ch == 'R') =>
+              throw new RegexUnsupportedException("Regex sequences with a line terminator in a " 
+                    + "class followed by '$' are not supported in replace mode")
             case Some(RegexChar(ch)) if ch == '\r' =>
               // when using the the CR (\r), it prevents the line anchor from handling any other 
               // line terminator sequences, so we just output the anchor and we are finished
@@ -804,8 +808,7 @@ class CudfRegexTranspiler(mode: RegexMode) {
         case 'A' if mode == RegexSplitMode =>
           throw new RegexUnsupportedException("string anchor \\A is not supported in split mode")
         case 'Z' if mode == RegexSplitMode =>
-          throw new RegexUnsupportedException(
-              "string anchor \\Z is not supported in split or replace mode")
+          throw new RegexUnsupportedException("string anchor \\Z is not supported in split mode")
         case 'z' if mode == RegexSplitMode =>
           throw new RegexUnsupportedException("string anchor \\z is not supported in split mode")
         case 'z' =>
@@ -983,6 +986,26 @@ class CudfRegexTranspiler(mode: RegexMode) {
                     // supported by cuDF
                     // in this case: $\n would transpile to (?!\r)\n$
                     throw new RegexUnsupportedException("regex sequence $\\n is not supported")
+                  case RegexEscaped(ch) if ch == 's'=>
+                    r(j) = RegexSequence(
+                      ListBuffer(
+                        rewrite(part, replacement, None),
+                        RegexSequence(ListBuffer(
+                          RegexRepetition(lineTerminatorMatcher(
+                              Set(' ', '\t', '\n', '\u000b', '\f','\r'), 
+                              true, false),
+                            SimpleQuantifier('?')), RegexChar('$')))))
+                    popBackrefIfNecessary(false)
+                  case RegexEscaped(ch) if ch == 'v' =>
+                    r(j) = RegexSequence(
+                      ListBuffer(
+                        rewrite(part, replacement, None),
+                        RegexSequence(ListBuffer(
+                          RegexRepetition(lineTerminatorMatcher(
+                              Set('\n', '\u000b', '\f', '\r', '\u0085', '\u2028', '\u2029'), 
+                              true, false),
+                            SimpleQuantifier('?')), RegexChar('$')))))
+                    popBackrefIfNecessary(false)
                   case RegexChar(ch) if "\r\u0085\u2028\u2029".contains(ch) =>
                     r(j) = RegexSequence(
                       ListBuffer(
@@ -1037,6 +1060,19 @@ class CudfRegexTranspiler(mode: RegexMode) {
           if mode != RegexFindMode =>
           throw new RegexUnsupportedException(
             "regex_replace and regex_split on GPU do not support repetition with {0}")
+
+        case (_, SimpleQuantifier('*')) | (_, SimpleQuantifier('?')) |
+          (_, QuantifierFixedLength(0)) | (_, QuantifierVariableLength(0, _)) 
+          if (previous match {
+            case Some(RegexChar('$')) => true
+            case Some(RegexEscaped('Z')) => true
+            case _ => false 
+          }) =>
+          // see: https://github.com/NVIDIA/spark-rapids/issues/5525
+          // Example: Pattern $x*\r with input \r, CPU will find match but GPU will not
+          // because Java is inconsistent with when it decides to consume linebreaks after $
+          throw new RegexUnsupportedException("Regex sequences with $ followed by a " +
+            "quantifier with minimum 0 matches is not supported")
 
         case (RegexGroup(capture, term), SimpleQuantifier(ch))
             if "+*".contains(ch) && !isSupportedRepetitionBase(term) =>
