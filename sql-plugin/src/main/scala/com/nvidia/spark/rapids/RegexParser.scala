@@ -724,10 +724,25 @@ class CudfRegexTranspiler(mode: RegexMode) {
               && lineTerminatorChars.contains(ch) =>
               throw new RegexUnsupportedException("Regex sequences with a line terminator " 
                   + "character followed by '$' are not supported in replace mode")
-            case Some(RegexEscaped(ch)) if mode == RegexReplaceMode 
-              && (ch == 's' || ch == 'v' || ch == 'R') =>
-              throw new RegexUnsupportedException("Regex sequences with a line terminator in a " 
-                    + "class followed by '$' are not supported in replace mode")
+            case Some(RegexEscaped(ch)) if ch == 's' || ch == 'v' || ch == 'R' =>
+              RegexSequence(ListBuffer(
+                RegexRepetition(lineTerminatorMatcher(Set('\r', '\n'), true,
+                    mode == RegexReplaceMode), SimpleQuantifier('?')),
+                RegexChar('$')))
+            case Some(charClass: RegexCharacterClass) 
+              if lineTerminatorChars.exists(c => charClass.toRegexString.contains(s"$c")) =>
+              val exclude = lineTerminatorChars.filter(c => 
+                      charClass.toRegexString.contains(s"$c")).toSet
+
+              if(exclude.contains('\r')) {
+                RegexChar('$')
+              } else {
+                RegexSequence(ListBuffer(
+                  RegexRepetition(lineTerminatorMatcher(exclude, true,
+                      mode == RegexReplaceMode), SimpleQuantifier('?')),
+                  RegexChar('$')))
+              }
+              
             case Some(RegexChar(ch)) if ch == '\r' =>
               // when using the the CR (\r), it prevents the line anchor from handling any other 
               // line terminator sequences, so we just output the anchor and we are finished
@@ -986,26 +1001,6 @@ class CudfRegexTranspiler(mode: RegexMode) {
                     // supported by cuDF
                     // in this case: $\n would transpile to (?!\r)\n$
                     throw new RegexUnsupportedException("regex sequence $\\n is not supported")
-                  case RegexEscaped(ch) if ch == 's'=>
-                    r(j) = RegexSequence(
-                      ListBuffer(
-                        rewrite(part, replacement, None),
-                        RegexSequence(ListBuffer(
-                          RegexRepetition(lineTerminatorMatcher(
-                              Set(' ', '\t', '\n', '\u000b', '\f','\r'), 
-                              true, false),
-                            SimpleQuantifier('?')), RegexChar('$')))))
-                    popBackrefIfNecessary(false)
-                  case RegexEscaped(ch) if ch == 'v' =>
-                    r(j) = RegexSequence(
-                      ListBuffer(
-                        rewrite(part, replacement, None),
-                        RegexSequence(ListBuffer(
-                          RegexRepetition(lineTerminatorMatcher(
-                              Set('\n', '\u000b', '\f', '\r', '\u0085', '\u2028', '\u2029'), 
-                              true, false),
-                            SimpleQuantifier('?')), RegexChar('$')))))
-                    popBackrefIfNecessary(false)
                   case RegexChar(ch) if "\r\u0085\u2028\u2029".contains(ch) =>
                     r(j) = RegexSequence(
                       ListBuffer(
@@ -1014,6 +1009,13 @@ class CudfRegexTranspiler(mode: RegexMode) {
                           RegexRepetition(lineTerminatorMatcher(Set(ch), true, false),
                             SimpleQuantifier('?')), RegexChar('$')))))
                     popBackrefIfNecessary(false)
+                  case RegexEscaped(ch) if ch == 's' || ch == 'v' || ch == 'R' =>
+                    throw new RegexUnsupportedException("Regex sequence with a $ followed by a" +
+                      "character class containing a line terminator is not supported")
+                  case charClass: RegexCharacterClass 
+                    if lineTerminatorChars.exists(c => charClass.toRegexString.contains(s"$c")) =>
+                    throw new RegexUnsupportedException("Regex sequence with a $ followed by a" +
+                      "character class containing a line terminator is not supported")
                   case _ =>
                     r.append(rewrite(part, replacement, last))
                 }

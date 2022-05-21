@@ -27,33 +27,6 @@ import org.apache.spark.sql.rapids.GpuRegExpUtils
 import org.apache.spark.sql.types.DataTypes
 
 class RegularExpressionTranspilerSuite extends FunSuite with Arm {
-  test("temp") {
-    assertCpuGpuMatchesRegexpFind(Seq("$\\W"), Seq("c+*3c($\r"))
-  }
-
-
-
-  test("zero match quantifier after $ ") {
-    assertUnsupported("$x*\r", RegexFindMode, "Regex sequences with $ followed by a " +
-            "quantifier with minimum 0 matches is not supported")
-  }
-  
-
-  // test("temp1") {
-  //   assertCpuGpuMatchesRegexpReplace(Seq("\\s\\Z\\Z"), Seq("\f\n"))
-  // }
-
-  // test("temp2") {
-  //   assertCpuGpuMatchesRegexpReplace(Seq("\f\\Z\\Z"), Seq("\f\n"))
-  // }
-
-  // test("temp3") {
-  //   assertCpuGpuMatchesRegexpReplace(Seq("\n\\Z\\Z"), Seq("\n\n"))
-  // }
-
-  // test("temp4") {
-  //   assertCpuGpuMatchesRegexpReplace(Seq("a\\Z\\Z"), Seq("a\n"))
-  // }
 
   test("transpiler detects invalid cuDF patterns") {
     // The purpose of this test is to document some examples of valid Java regular expressions
@@ -132,6 +105,15 @@ class RegularExpressionTranspilerSuite extends FunSuite with Arm {
         "Regex sequences with a line terminator character followed by " +
           "'$' are not supported in replace mode")
     )
+  }
+
+  test("unsupported sequences following a $ ") {
+    assertUnsupported("$x*\r", RegexFindMode, "Regex sequences with $ followed by a " +
+      "quantifier with minimum 0 matches is not supported")
+    Seq("$[ab\nc]", "$\\s", "\\Z\\R", "\\Z\\v").foreach{ pattern =>
+      assertUnsupported(pattern, RegexFindMode, "Regex sequence with a $ followed by a" +
+        "character class containing a line terminator is not supported")
+    }
   }
 
   test("cuDF does not support possessive quantifier") {
@@ -743,12 +725,6 @@ class RegularExpressionTranspilerSuite extends FunSuite with Arm {
       for (i <- input.indices) {
         if (cpu(i) != gpu(i)) {
           fail(s"javaPattern=${toReadableString(javaPattern)}, " +
-            s"cudfPattern=${toReadableString(cudfPattern)}, " +
-            s"input='${toReadableString(input(i))}', " +
-            s"cpu=${toReadableString(cpu(i))}, " +
-            s"gpu=${toReadableString(gpu(i))}")
-        } else {
-          println(s"javaPattern=${toReadableString(javaPattern)}, " +
             s"cudfPattern=${toReadableString(cudfPattern)}, " +
             s"input='${toReadableString(input(i))}', " +
             s"cpu=${toReadableString(cpu(i))}, " +
