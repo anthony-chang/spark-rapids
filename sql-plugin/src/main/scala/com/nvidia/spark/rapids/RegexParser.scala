@@ -1022,9 +1022,6 @@ class CudfRegexTranspiler(mode: RegexMode) {
           } else {
             RegexCharacterClass(negated = false, components)
           }
-        case 'b' | 'B' if mode == RegexSplitMode =>
-          // see https://github.com/NVIDIA/spark-rapids/issues/5478
-          throw new RegexUnsupportedException("word boundaries are not supported in split mode")
         case 'A' if mode == RegexSplitMode =>
           throw new RegexUnsupportedException("string anchor \\A is not supported in split mode")
         case 'Z' if mode == RegexSplitMode =>
@@ -1349,10 +1346,20 @@ class CudfRegexTranspiler(mode: RegexMode) {
       case RegexGroup(capture, term) =>
         term match {
           case RegexSequence(parts) =>
-            if (!parts.forall(!isBeginOrEndLineAnchor(_))) {
-              throw new RegexUnsupportedException(
-                "line and string anchors are not supported in capture groups"
-              )
+            parts.foreach { part =>
+              if (isBeginOrEndLineAnchor(part)) {
+                throw new RegexUnsupportedException(
+                  "line and string anchors are not supported in capture groups"
+                )
+              }
+              if (contains(part, {
+                case RegexEscaped('b') | RegexEscaped('B') => true
+                case _ => false
+              })) {
+                throw new RegexUnsupportedException(
+                  "word and non-word boundaries are not supported in capture groups"
+                )
+              }
             }
             RegexGroup(capture, rewrite(term, replacement, None))
           case _ =>

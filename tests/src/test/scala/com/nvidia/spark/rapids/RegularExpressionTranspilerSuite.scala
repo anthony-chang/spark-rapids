@@ -29,6 +29,10 @@ import org.apache.spark.sql.types.DataTypes
 
 class RegularExpressionTranspilerSuite extends FunSuite with Arm {
 
+  test("temp") {
+    assertCpuGpuMatchesRegexpReplace(Seq(raw"\B"), Seq(":s,("))
+  }
+
   test("transpiler detects invalid cuDF patterns") {
     // The purpose of this test is to document some examples of valid Java regular expressions
     // that fail to compile in cuDF and to check that the transpiler detects these correctly.
@@ -295,13 +299,6 @@ class RegularExpressionTranspilerSuite extends FunSuite with Arm {
       assertUnsupported(pattern, RegexFindMode,
         "End of line/string anchor is not supported in this context")
     }
-  }
-
-  test ("word boundaries will fall back to CPU - split") {
-    val patterns = Seq("\\b", "\\B")
-    patterns.foreach(pattern =>
-      assertUnsupported(pattern, RegexSplitMode, "word boundaries are not supported in split mode")
-    )
   }
 
   test("whitespace boundaries - replace") {
