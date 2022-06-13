@@ -30,7 +30,19 @@ import org.apache.spark.sql.types.DataTypes
 class RegularExpressionTranspilerSuite extends FunSuite with Arm {
 
   test("temp") {
-    assertCpuGpuMatchesRegexpReplace(Seq(raw"\B"), Seq(":s,("))
+    doStringSplitTest(Set(raw"\B"), Seq(":s,("), -1)
+  }
+
+  test("temp1") {
+    doStringSplitTest(Set(raw"\B"), Seq("("), -1)
+  }
+
+  test("temp2") {
+    doStringSplitTest(Set(raw"\B"), Seq(":"), -1)
+  }
+
+  test("temp3") {
+    doStringSplitTest(Set(raw"\B"), Seq(","), -1)
   }
 
   test("transpiler detects invalid cuDF patterns") {
