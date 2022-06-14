@@ -131,7 +131,7 @@ class RegularExpressionTranspilerSuite extends FunSuite with Arm {
   }
 
   test("cuDF does not support empty sequence") {
-    val patterns = Seq("", "a|", "()")
+    val patterns = Seq("", "a|")
     patterns.foreach(pattern =>
       assertUnsupported(pattern, RegexFindMode, "empty sequence not supported")
     )

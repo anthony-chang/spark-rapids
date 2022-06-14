@@ -161,7 +161,10 @@ class RegexParser(pattern: String) {
     } else {
       true
     }
-    val term = parseUntil(() => peek().contains(')'))
+    val term = peek() match {
+      case Some(')') => RegexEmpty()
+      case _ => parseUntil(() => peek().contains(')'))
+    }
     consumeExpected(')')
     RegexGroup(captureGroup, term)
   }
@@ -1129,7 +1132,7 @@ class CudfRegexTranspiler(mode: RegexMode) {
 
       case RegexSequence(parts) =>
         if (parts.isEmpty) {
-          // examples: "", "()", "a|", "|b"
+          // examples: "", "a|", "|b"
           throw new RegexUnsupportedException("empty sequence not supported")
         }
         if (isRegexChar(parts.head, '|') || isRegexChar(parts.last, '|')) {
@@ -1309,6 +1312,8 @@ class CudfRegexTranspiler(mode: RegexMode) {
           // \A{1,5} can be transpiled to \A (dropping the repetition)
           // \Z{1,} can be transpiled to \Z (dropping the repetition)
           rewrite(base, replacement, previous)
+        case (RegexEmpty(), _) =>
+          throw new RegexUnsupportedException(nothingToRepeat)
         case _ if isSupportedRepetitionBase(base) =>
           RegexRepetition(rewrite(base, replacement, None), quantifier)
         case _ =>
@@ -1358,6 +1363,9 @@ class CudfRegexTranspiler(mode: RegexMode) {
           case _ =>
             RegexGroup(capture, rewrite(term, replacement, None))
         }
+
+      case RegexEmpty() =>
+        RegexEmpty()
 
       case other =>
         throw new RegexUnsupportedException(s"Unhandled expression in transpiler: $other")
