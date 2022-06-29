@@ -29,20 +29,40 @@ import org.apache.spark.sql.types.DataTypes
 
 class RegularExpressionTranspilerSuite extends FunSuite with Arm {
 
-  test("temp") {
-    doStringSplitTest(Set(raw"\B"), Seq(":s,("), -1)
+  test("\\b") {
+    doStringSplitTest(Set(raw"\b"), Seq("a", "ab", "-+"), -1)
   }
 
-  test("temp1") {
-    doStringSplitTest(Set(raw"\B"), Seq("("), -1)
+  test("a\\b") {
+    doStringSplitTest(Set(raw"a\b"), Seq("a", "ab", "-+"), -1)
   }
 
-  test("temp2") {
-    doStringSplitTest(Set(raw"\B"), Seq(":"), -1)
+  test("\\ba") {
+    doStringSplitTest(Set(raw"\ba"), Seq("a", "ab", "-+"), -1)
   }
 
-  test("temp3") {
-    doStringSplitTest(Set(raw"\B"), Seq(","), -1)
+  test("\\b\\b") {
+    doStringSplitTest(Set(raw"\b\b"), Seq("a", "ab", "-+"), -1)
+  }
+
+  test("\\b\\n") {
+    doStringSplitTest(Set("\\b\n"), Seq("a", "ab", "-+"), -1)
+  }
+
+  test("\\n\\b") {
+    doStringSplitTest(Set("\n\\b"), Seq("a", "ab", "-+"), -1)
+  }
+
+  test("\\B\\b") {
+    doStringSplitTest(Set("\\B\\b"), Seq("a", "ab", "-+"), -1)
+  }
+
+  test("\\B\\B") {
+    doStringSplitTest(Set("\\B\\B"), Seq("a", "ab", "-+"), -1)
+  }
+
+  test("\\b\\B") {
+    doStringSplitTest(Set("\\b\\B"), Seq("a", "ab", "-+"), -1)
   }
 
   test("transpiler detects invalid cuDF patterns") {
