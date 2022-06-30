@@ -65,6 +65,10 @@ class RegularExpressionTranspilerSuite extends FunSuite with Arm {
     doStringSplitTest(Set("\\b\\B"), Seq("a", "ab", "-+"), -1)
   }
 
+  test("((\\b))") {
+    doStringSplitTest(Set("((\\b))"), Seq(""), -1)
+  }
+
   test("transpiler detects invalid cuDF patterns") {
     // The purpose of this test is to document some examples of valid Java regular expressions
     // that fail to compile in cuDF and to check that the transpiler detects these correctly.
@@ -686,7 +690,19 @@ class RegularExpressionTranspilerSuite extends FunSuite with Arm {
   }
 
   def doStringSplitTest(patterns: Set[String], data: Seq[String], limit: Int) {
+
+    def isEntirely(pattern: RegexAST, component: RegexAST): Boolean = {
+      pattern match {
+        case RegexSequence(parts) => parts.forall(isEntirely(_, component))
+        case RegexGroup(_, term) => isEntirely(term, component)
+        case RegexChoice(l, r) => isEntirely(l, component) || isEntirely(r, component)
+        case `component` => true
+        case _ => false
+      }
+    }
+
     for (pattern <- patterns) {
+      val ast = parse(pattern)
       val cpu = cpuSplit(pattern, data, limit)
       val transpiler = new CudfRegexTranspiler(RegexSplitMode)
       val (isRegex, cudfPattern) = if (RegexParser.isRegExpString(pattern)) {
@@ -701,7 +717,7 @@ class RegularExpressionTranspilerSuite extends FunSuite with Arm {
       assert(cpu.length == gpu.length)
       for (i <- cpu.indices) {
         val cpuArray = cpu(i)
-        val gpuArray = gpu(i)
+        val gpuArray = if ((isEntirely(ast, RegexEscaped('b')) || isEntirely(ast, RegexEscaped('B'))) && gpu(i).head == "" && gpu(i).length > 1) gpu(i).tail else gpu(i)
         if (!cpuArray.sameElements(gpuArray)) {
           fail(s"string_split pattern=${toReadableString(pattern)} " +
             s"isRegex=$isRegex " +
