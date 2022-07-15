@@ -573,6 +573,7 @@ The following Apache Spark regular expression functions and expressions are supp
 - `regexp_replace`
 - `string_split`
 - `str_to_map`
+- `regexp_substr` (only Spark versions 3.4.0 or later)
 
 Regular expression evaluation on the GPU is enabled by default. Execution will fall back to the CPU for
 regular expressions that are not yet supported on the GPU. However, there are some edge cases that will

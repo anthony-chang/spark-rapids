@@ -22,7 +22,7 @@ from data_gen import *
 from marks import *
 from pyspark.sql.types import *
 import pyspark.sql.functions as f
-from spark_session import is_before_spark_320
+from spark_session import is_before_spark_320, is_before_spark_340
 
 _regexp_conf = { 'spark.rapids.sql.regexp.enabled': 'true' }
 
@@ -1175,3 +1175,13 @@ def test_regexp_extract_all_idx_out_of_bounds():
             ).collect(),
         error_message="Regex group count is 2, but the specified group index is 3",
         conf=_regexp_conf)
+
+@pytest.mark.skipif(is_before_spark_340(), reason='regexp_substr was added in Spark 3.4.0')
+def test_regexp_substr():
+    gen = mk_str_gen('[abcd]{1,3}[0-9]{1,3}[abcd]{1,3}')
+    assert_gpu_and_cpu_are_equal_collect(
+            lambda spark: unary_op_df(spark, gen).selectExpr(
+                'regexp_substr(a, "[abcd]")',
+                'regexp_substr(a, "^([a-d]*)([0-9]*)([a-d]*)\\z")',
+                'regexp_substr(a, "^([a-d]*)[0-9]*([a-d]*)\\z")'),
+        conf=_regexp_conf)    
